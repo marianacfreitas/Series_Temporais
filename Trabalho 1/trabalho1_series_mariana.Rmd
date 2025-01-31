@@ -24,7 +24,7 @@ dados <- read.table(url, header = TRUE) |>
 retornos <- dados$ibov
 ```
 
-Para a variância condicionar, vamos usar um modelo de Suavização Exponencial Simples (SES), que segue a seguinte equação de recorrência:
+Para a variância condicional, vamos usar um modelo de Suavização Exponencial Simples (SES), que segue a seguinte equação de recorrência:
 
 $$
 \sigma^2_t = \alpha \sigma^2_{t-1} + (1- \alpha)r^2_{t-1}
