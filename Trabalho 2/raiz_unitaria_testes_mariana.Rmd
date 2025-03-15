@@ -1,0 +1,214 @@
+---
+title: 'Séries Temporais: Trabalho 2'
+author: "Mariana Costa Freitas"
+date: " "
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F)
+```
+
+# O que são os testes de Dickey Fuller e Phillip Perron?
+
+Uma série temporal tem uma raiz unitária se, em sua equação característica, temos  uma raiz igual a 1, indicando que a série é não estacionária.
+
+Os testes de Dickey Fuller e Phillip Perron são utilizados para verificar a presença de uma raíz unitária em uma série temporal, ou seja, se uma série é ou não estacionária (garante propriedades como média e variância constantes ao longo do tempo). Isso é importante para a modelagem e previsão de séries temporais, pois muitas técnicas assumem que a série é estacionária.
+
+
+# Teste de Dickey Fuller
+
+O teste de Dickey-Fuller verifica a hipótese nula de que uma série temporal possui uma raiz unitária, ou seja, não é estacionária, contra a hipótese alternativa de que a série é estacionária. Para isso, os seguintes passos são seguidos:
+
++ Estimar a regressão: ajustar um modelo de regressão para a série.
+
++ Calcular a estatística do teste: calcular a estatística $DF = \frac{\hat{\gamma}}{SE(\hat{\gamma})}$ ($\hat{\gamma}$ é é a estimativa do coeficiente associado a $y_{t-1}$ no modelo) com base no coeficiente estimado e seu erro padrão.
+
++ Comparar com valores críticos: comparar a estatística DF com valores críticos tabelados para determinar se rejeitamos ou não a hipótese nula.
+
+# Teste de Phillip Perron
+
+O teste de Phillips Perron é bem parecido com o teste anterior, porém faz ajustes para lidar com autocorrelação e heterocedasticidade.
+
++ Estimar a regressão: ajustar um modelo de regressão para a série.
+
++ Ajustar para autocorrelação e heterocedasticidade: o teste de Phillips-Perron corrige automaticamente a presença de autocorrelação e heterocedasticidade nos resíduos do modelo.
+
++ Calcular a a estatística de teste de Phillips-Perron $Z(t) = \frac{\hat{\gamma}}{SE(\hat{\gamma})} \sqrt{\frac{\hat{\sigma^2}}{\hat{\sigma^2_u}}}$ ($\sigma^2$ é a variância dos resíduos do modelo e $\sigma^2_u$ é a variância de longo prazo dos resíduos, ajustada para autocorrelação e heterocedasticidade).
+
++ Comparar com valores críticos: comparar a estatística DF com valores críticos tabelados para determinar se rejeitamos ou não a hipótese nula.
+
+# Aplicações
+
+Vamos aplicar esses testes a três séries: preços diários de ações da Petrobras, preços diários de ações do Banespa e índices mensais do IBOVESPA, plotados abaixo.
+
+```{r, echo=FALSE}
+library(ggplot2)
+library(patchwork)
+library(httr)
+library(dplyr)
+
+url <- "https://www.ime.usp.br/~pam/D-PETRO"
+dados <- GET(url)
+petro <- read.csv(text = content(dados, "text")) |>
+  rename(precos = X8780.295)
+
+url <- "https://www.ime.usp.br/~pam/D-BANESPA"
+dados <- GET(url)
+banespa <- read.csv(text = content(dados, "text")) |>
+  rename(preco = X7.438023)
+
+url <- "https://www.ime.usp.br/~pam/M-IBV-SP"
+dados <- GET(url)
+ibov <- read.table(text = content(dados, "text"), header = T) #|>
+  #rename(preco = X7.438023)
+
+# Petrobras
+s1 <- ggplot(petro, aes(x = 1:length(petro$precos), y = petro$precos)) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Série de preços diários de ações \n da Petrobras", x = "Tempo", y = "Valores") +
+  theme_minimal()
+
+s2 <- ggplot(banespa, aes(x = 1:length(banespa$preco), y = banespa$preco)) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Série de preços diários de ações \n do Banespa", x = "Tempo", y = "Valores") +
+  theme_minimal()
+
+s3 <- ggplot(ibov, aes(x = 1:length(ibov$IBOV), y = ibov$IBOV)) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Série de índices mensais do IBOVESPA", x = "Tempo", y = "Valores") +
+  theme_minimal()
+
+empty <- plot_spacer()
+
+combine <- (s1 +s2)/(s3 + empty)
+
+combine
+```
+
+
+## Série de preços diários de ações da Petrobras
+
+```{r, out.width= "80%", fig.align='center'}
+library(httr)
+library(dplyr)
+library(tseries)
+library(urca)
+url <- "https://www.ime.usp.br/~pam/D-PETRO"
+dados <- GET(url)
+petro <- read.csv(text = content(dados, "text")) |>
+  rename(precos = X8780.295)
+
+ggplot(petro, aes(x = 1:length(petro$precos), y = petro$precos)) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Série de preços diários de ações da Petrobras", x = "Tempo", y = "Valores") +
+  theme_minimal()
+
+
+```
+
+Para fazer o teste de Dickey-Fuller, usamos `type = 'trend'"`, pois a série apresenta intercepto e também parece apresentar tendência. Também foi usado `selecLags = "AIC"` para que o número de lags usado para corrigir a autocorrelação dos resíduos seja escolhido automaticamente com base no critério de AIC.
+
+```{r}
+testedf <- urca::ur.df(y = petro$precos, type = "trend", selectlags = "AIC")
+summary(testedf)
+
+```
+
+No output, primeiro temos as informações sobre o modelo que foi usado para o teste, como o intercepto, coeficiente associado ao lag 1 (z.lag.1), o coeficiente da tendência linear (tt) e o coeficiente do lag da primeira diferença (z.diff.lag).
+
+Obtemos que a estatística teste é -2.102 e o valor crítico para um nível de significância de 5\% é -3.41. Como a estatística teste é maior que o valor crítico, aceitamos a hipótese nula e concluímos que a série não é estacionária.
+
+A seguir, vamos verificar se o teste de Phillips Perron apresenta os mesmos resultados. Vamos usar `type = "Z-tau"` para definir a estatística teste usada e `model = trend` para informar que o modelo apresenta tendência.
+
+
+```{r}
+testepp <- urca::ur.pp(petro$precos, type = "Z-tau", model = "trend")
+summary(testepp)
+```
+
+Primeiro são retornados informações do modelo usado, como o intercepto, o coeficiente associado ao primeiro lag e a tendência. Abaixo, temos que o valor da estatística foi -1.9529  e o valor crítico para um nível de significância de 5\% foi -3.415306. Como a estatística teste é maior que o valor crítico, aceitamos a hipótese nula, ou seja, há uma raíz unitária e a série não é estacionária.
+
+## Série de preços diários de ações do Banespa
+
+```{r, out.width= "80%", fig.align='center'}
+library(httr)
+library(dplyr)
+library(tseries)
+
+url <- "https://www.ime.usp.br/~pam/D-BANESPA"
+dados <- GET(url)
+banespa <- read.csv(text = content(dados, "text")) |>
+  rename(preco = X7.438023)
+
+ggplot(banespa, aes(x = 1:length(banespa$preco), y = banespa$preco)) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Série de preços diários de ações do Banespa", x = "Tempo", y = "Valores") +
+  theme_minimal()
+
+
+```
+
+Assim como anteriormente, usamos `type = 'trend'"`, pois a série apresenta intercepto e também parece apresentar tendência e `selecLags = "AIC"` para que o número de lags usado para corrigir a autocorrelação dos resíduos seja escolhido automaticamente com base no critério de AIC.
+
+```{r}
+testedf <- urca::ur.df(y = banespa$preco, type = "trend", selectlags = "AIC")
+summary(testedf)
+
+```
+
+No output, primeiro temos as informações sobre o modelo que foi usado para o teste, como o intercepto, coeficiente associado ao lag 1 (z.lag.1), o coeficiente da tendência linear (tt) e o coeficiente do lag da primeira diferença (z.diff.lag).
+
+Obtemos que a estatística teste é -2.6291 e o valor crítico para um nível de significância de 5\% é -3.41. Como a estatística teste é maior que o valor crítico, aceitamos a hipótese nula e concluímos que a série não é estacionária.
+
+Agora, vamos usar o teste de Phillips Perron. Novamente, usamos `type = "Z-tau"` para definir a estatística teste usada e `model = trend` para informar que o modelo apresenta tendência.
+
+
+```{r}
+testepp <- urca::ur.pp(banespa$preco, type = "Z-tau", model = "trend")
+summary(testepp)
+```
+
+Primeiro são retornados informações do modelo usado, como o intercepto, o coeficiente associado ao primeiro lag e a tendência. Em seguida, temos que o valor da estatística foi -2.5502   e o valor crítico para um nível de significância de 5\% foi -3.415306.
+
+Como a estatística teste é maior que o valor crítico, aceitamos a hipótese nula, ou seja, há uma raíz unitária e a série não é estacionária.
+
+## Série de índices mensais do IBOVESPA
+
+```{r, out.width= "80%", fig.align='center'}
+url <- "https://www.ime.usp.br/~pam/M-IBV-SP"
+dados <- GET(url)
+ibov <- read.table(text = content(dados, "text"), header = T) #|>
+  #rename(preco = X7.438023)
+  
+ggplot(ibov, aes(x = 1:length(ibov$IBOV), y = ibov$IBOV)) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Série de índices mensais do IBOVESPA", x = "Tempo", y = "Valores") +
+  theme_minimal()
+
+
+```
+
+Dessa vez iremos usar `type = 'drift'"`, pois a série apresenta intercepto, mas não parece apresentar tendência e `selecLags = "AIC"` para que o número de lags usado para corrigir a autocorrelação dos resíduos seja escolhido automaticamente com base no critério de AIC.
+
+```{r}
+testedf <- urca::ur.df(y = ibov$IBOV, type = "drift", selectlags = "AIC")
+summary(testedf)
+
+```
+
+No output, primeiro temos as informações sobre o modelo que foi usado para o teste, como o intercepto, coeficiente associado ao lag 1 (z.lag.1) e o coeficiente do lag da primeira diferença (z.diff.lag).
+
+Obtemos que a estatística teste é -2.345 e o valor crítico para um nível de significância de 5\% é -2.89. Como a estatística teste é maior que o valor crítico, aceitamos a hipótese nula e concluímos que a série não é estacionária.
+
+Mais uma vez, vamos executar o teste de Phillips Perron. Aqui usamos `type = "Z-tau"` para definir a estatística teste usada e `model = constant` para informar que o modelo apresenta intercepto, mas não tendência.
+
+
+```{r}
+testepp <- urca::ur.pp(ibov$IBOV, type = "Z-tau", model = "constant")
+summary(testepp)
+```
+
+Primeiro são retornados informações do modelo usado, como o intercepto e o coeficiente associado ao primeiro lag. Em seguida, temos que o valor da estatística foi -2.4127 e o valor crítico para um nível de significância de 5\% foi -2.895068
+
+Como a estatística teste é maior que o valor crítico, aceitamos a hipótese nula, ou seja, há uma raíz unitária e a série não é estacionária.
